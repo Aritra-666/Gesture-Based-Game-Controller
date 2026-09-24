@@ -1,4 +1,6 @@
-.pio/build/esp32dev/src/main.cpp.o: src/main.cpp \
+.pio/build/esp32dev/lib27f/Preferences/Preferences.cpp.o: \
+ /home/maverick/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src/Preferences.cpp \
+ /home/maverick/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src/Preferences.h \
  /home/maverick/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h \
  /home/maverick/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp_arduino_version.h \
  /home/maverick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/freertos/include/freertos/FreeRTOS.h \
@@ -133,6 +135,6 @@
  /home/maverick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/esp_hw_support/include/soc/esp32/spiram.h \
  /home/maverick/.platformio/packages/framework-arduinoespressif32/cores/esp32/io_pin_remap.h \
  /home/maverick/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h \
- /home/maverick/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.h \
- /home/maverick/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h \
- /home/maverick/.platformio/packages/framework-arduinoespressif32/libraries/Preferences/src/Preferences.h
+ /home/maverick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/nvs_flash/include/nvs.h \
+ /home/maverick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/nvs_flash/include/nvs_flash.h \
+ /home/maverick/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/nvs_flash/include/nvs.h
