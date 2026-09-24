@@ -1,0 +1,250 @@
+#ifndef ESP32_BLE_GAMEPAD_H
+#define ESP32_BLE_GAMEPAD_H
+#include "sdkconfig.h"
+#if defined(CONFIG_BT_ENABLED)
+
+#include "nimconfig.h"
+#if defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+
+#include "BleConnectionStatus.h"
+#include "NimBLEHIDDevice.h"
+#include "NimBLECharacteristic.h"
+#include "BleGamepadConfiguration.h"
+#include "BleOutputReceiver.h"
+#include "BleFeatureReport.h"
+#include "BleSInput.h"
+#include "BleXInput.h"
+
+// Debug enabled, disabled by default
+#ifndef BLE_GAMEPAD_DEBUG
+#define BLE_GAMEPAD_DEBUG 0
+#endif
+
+// Input capabilities
+#define BLE_CAP_BUTTONS    (1 << 0)
+#define BLE_CAP_AXES       (1 << 1)
+#define BLE_CAP_HAT        (1 << 2)
+
+// Feedback capabilities
+#define BLE_CAP_RUMBLE     (1 << 0)
+#define BLE_CAP_PLAYERLED  (1 << 1)
+#define BLE_CAP_RGBLED     (1 << 2)
+
+// Sensor capabilities
+#define BLE_CAP_GYRO       (1 << 0)
+#define BLE_CAP_ACCEL      (1 << 1)
+
+class BleGamepad
+{
+  private:
+    std::string deviceManufacturer;
+    std::string deviceName;
+    uint8_t tempHidReportDescriptor[512];
+    int hidReportDescriptorSize;
+    uint8_t hidReportSize;
+    uint8_t numOfButtonBytes;
+    uint8_t genericButtonPaddingBits;
+    uint8_t genericSpecialButtonPaddingBits;
+    uint8_t _specialButtonPositions[POSSIBLESPECIALBUTTONS];
+    bool enableOutputReport;
+    uint16_t outputReportLength;
+    bool enableFeatureReport;
+    uint16_t featureReportLength;
+    bool enableSInput;
+    uint8_t _buttons[16]; // 8 bits x 16 bytes = 128 bits --> 128 button max
+    uint8_t _specialButtons;
+    int16_t _x;
+    int16_t _y;
+    int16_t _z;
+    int16_t _rX;
+    int16_t _rY;
+    int16_t _rZ;
+    int16_t _slider1;
+    int16_t _slider2;
+    int16_t _rudder;
+    int16_t _throttle;
+    int16_t _accelerator;
+    int16_t _brake;
+    int16_t _steering;
+    int16_t _hat1;
+    int16_t _hat2;
+    int16_t _hat3;
+    int16_t _hat4;
+    int16_t _gX;
+    int16_t _gY;
+    int16_t _gZ;
+    int16_t _aX;
+    int16_t _aY;
+    int16_t _aZ;
+    int16_t _touch1X;
+    int16_t _touch1Y;
+    uint16_t _touch1Pressure;
+    int16_t _touch2X;
+    int16_t _touch2Y;
+    uint16_t _touch2Pressure;
+    uint8_t _batteryPowerInformation;
+    uint8_t _dischargingState;
+    uint8_t _chargingState;
+    uint8_t _powerLevel;
+
+    BleConnectionStatus *connectionStatus;
+    BleOutputReceiver *outputReceiver = nullptr;
+    BleFeatureReceiver *featureReceiver = nullptr;
+    BleSInputReceiver *sInputReceiver = nullptr;
+    BleXInputReceiver *xInputReceiver = nullptr;
+    NimBLEServer *pServer;
+
+    NimBLEHIDDevice *hid;
+    NimBLECharacteristic *inputGamepad;
+    NimBLECharacteristic *outputGamepad;
+    NimBLECharacteristic *featureGamepad;
+    NimBLECharacteristic *sInputGamepad;       // SInput Input Report 0x01 (regular gamepad state)
+    NimBLECharacteristic *sInputCmdGamepad;    // SInput Input Report 0x02 (command/feature response)
+    NimBLECharacteristic *sInputOutputGamepad; // SInput Output Report 0x03 (host -> device commands)
+    NimBLECharacteristic *xInputGamepad;       // XInput Input Report 0x01 (gamepad state)
+    NimBLECharacteristic *xInputConsumer;      // XInput Input Report 0x02 (Consumer Control - Home/Guide)
+    NimBLECharacteristic *xInputBattery;       // XInput Input Report 0x04 (Battery Strength)
+    NimBLECharacteristic *xInputOutputGamepad; // XInput Output Report 0x03 (rumble)
+    NimBLECharacteristic *pCharacteristic_Power_State;
+
+    uint8_t *outputBackupBuffer = nullptr;
+    uint8_t *featureBackupBuffer = nullptr;
+
+    void rawAction(uint8_t msg[], char msgSize);
+    static void taskServer(void *pvParameter);
+    uint8_t specialButtonBitPosition(uint8_t specialButton);
+    void buildGenericDescriptor();
+    void buildSInputDescriptor();
+    void buildXInputDescriptor();
+    void sendSInputReport();
+    void sendXInputReport();
+    void sendGenericReport();
+
+  public:
+    BleGamepadConfiguration configuration;
+    
+    BleGamepad(std::string deviceName = "ESP32 BLE Gamepad", std::string deviceManufacturer = "Espressif", uint8_t batteryLevel = 100, bool delayAdvertising = false);
+    void begin(BleGamepadConfiguration *config = nullptr);
+    void end(void);
+    void setAxes(int16_t x = 0, int16_t y = 0, int16_t z = 0, int16_t rX = 0, int16_t rY = 0, int16_t rZ = 0, int16_t slider1 = 0, int16_t slider2 = 0);
+    void setHIDAxes(int16_t x = 0, int16_t y = 0, int16_t z = 0, int16_t rZ = 0, int16_t rX = 0, int16_t rY = 0, int16_t slider1 = 0, int16_t slider2 = 0);
+    void press(uint8_t b = BUTTON_1);   // press BUTTON_1 by default
+    void release(uint8_t b = BUTTON_1); // release BUTTON_1 by default
+    // 64-bit button mask: bit N drives button N+1 (buttons 1..64).
+    // Same layout as press()/release(). Buttons 65+ are left unchanged -
+    // call resetButtons() first for a clean slate. Narrower values convert
+    // implicitly, e.g. setButtonsFromMask(myUint8).
+    void setButtonsFromMask(uint64_t mask);
+    // Full 128-button state: bits[0] holds buttons 1..8, ... bits[15] holds
+    // buttons 121..128. Same layout as press()/release(); byte-to-byte copy.
+    void setAllButtons(const uint8_t bits[16]);
+    void pressSpecialButton(uint8_t b);
+    void releaseSpecialButton(uint8_t b);
+    void pressStart();
+    void releaseStart();
+    void pressSelect();
+    void releaseSelect();
+    void pressMenu();
+    void releaseMenu();
+    void pressHome();
+    void releaseHome();
+    void pressBack();
+    void releaseBack();
+    void pressVolumeInc();
+    void releaseVolumeInc();
+    void pressVolumeDec();
+    void releaseVolumeDec();
+    void pressVolumeMute();
+    void releaseVolumeMute();
+    void setLeftThumb(int16_t x = 0, int16_t y = 0);
+    void setRightThumb(int16_t z = 0, int16_t rZ = 0);
+    void setRightThumbAndroid(int16_t z = 0, int16_t rX = 0);
+    void setLeftTrigger(int16_t rX = 0);
+    void setRightTrigger(int16_t rY = 0);
+    void setTriggers(int16_t rX = 0, int16_t rY = 0);
+    void setHats(signed char hat1 = 0, signed char hat2 = 0, signed char hat3 = 0, signed char hat4 = 0);
+    void setHat(signed char hat = 0);
+    void setHat1(signed char hat1 = 0);
+    void setHat2(signed char hat2 = 0);
+    void setHat3(signed char hat3 = 0);
+    void setHat4(signed char hat4 = 0);
+    void setX(int16_t x = 0);
+    void setY(int16_t y = 0);
+    void setZ(int16_t z = 0);
+    void setRZ(int16_t rZ = 0);
+    void setRX(int16_t rX = 0);
+    void setRY(int16_t rY = 0);
+    void setSliders(int16_t slider1 = 0, int16_t slider2 = 0);
+    void setSlider(int16_t slider = 0);
+    void setSlider1(int16_t slider1 = 0);
+    void setSlider2(int16_t slider2 = 0);
+    void setRudder(int16_t rudder = 0);
+    void setThrottle(int16_t throttle = 0);
+    void setAccelerator(int16_t accelerator = 0);
+    void setBrake(int16_t brake = 0);
+    void setSteering(int16_t steering = 0);
+    void setSimulationControls(int16_t rudder = 0, int16_t throttle = 0, int16_t accelerator = 0, int16_t brake = 0, int16_t steering = 0);
+    void sendReport();
+    bool isPressed(uint8_t b = BUTTON_1); // check BUTTON_1 by default
+    bool isConnected(void);
+    void resetButtons();
+    void setBatteryLevel(uint8_t level);
+    void setPowerStateAll(uint8_t batteryPowerInformation, uint8_t dischargingState, uint8_t chargingState, uint8_t powerLevel);
+    void setBatteryPowerInformation(uint8_t batteryPowerInformation);
+    void setDischargingState(uint8_t dischargingState);
+    void setChargingState(uint8_t chargingState);
+    void setPowerLevel(uint8_t powerLevel);
+    void setTXPowerLevel(int8_t level = 9);
+    int8_t getTXPowerLevel();
+    uint8_t batteryLevel;
+    bool delayAdvertising;
+    bool isOutputReceived();
+    uint8_t* getOutputBuffer();
+    bool isFeatureReceived();
+    uint8_t* getFeatureBuffer();
+    void setFeatureBuffer(const uint8_t* data, uint16_t length);
+    bool isPlayerLedReceived();
+    uint8_t getPlayerLedIndex();
+    bool isRumbleReceived();
+    uint8_t getRumbleLeftAmplitude();
+    uint8_t getRumbleRightAmplitude();
+    bool isRgbReceived();
+    uint8_t getRgbRed();
+    uint8_t getRgbGreen();
+    uint8_t getRgbBlue();
+    bool isXInputRumbleReceived();
+    uint8_t getXInputStrongMotor();
+    uint8_t getXInputWeakMotor();
+    uint8_t getXInputLeftTriggerMagnitude();
+    uint8_t getXInputRightTriggerMagnitude();
+    bool deleteBond(bool resetBoard = false);
+    bool deleteAllBonds(bool resetBoard = false);
+    bool enterPairingMode();
+    NimBLEAddress getAddress();
+    String getStringAddress();
+    NimBLEConnInfo getPeerInfo();
+    String getDeviceName();
+    String getDeviceManufacturer();
+    // Size (in bytes) of the HID input report and of the generated HID report
+    // descriptor. Both are (re)computed from scratch on every begin() call and
+    // read 0 before the first one. The descriptor is assembled into a fixed
+    // tempHidReportDescriptor[512] buffer, so getHidReportDescriptorSize()
+    // approaching 512 means the current configuration is close to overflowing it.
+    uint8_t getHidReportSize() const { return hidReportSize; }
+    int getHidReportDescriptorSize() const { return hidReportDescriptorSize; }
+    // The generated HID report descriptor bytes (length = getHidReportDescriptorSize()).
+    // Valid after begin(); points into the internal buffer. Handy for logging
+    // it (see BLE_GAMEPAD_DEBUG) or asserting it in a test harness.
+    const uint8_t *getHidReportDescriptor() const { return tempHidReportDescriptor; }
+    void setGyroscope(int16_t gX = 0, int16_t gY = 0, int16_t gZ = 0);
+    void setAccelerometer(int16_t aX = 0, int16_t aY = 0, int16_t aZ = 0);
+    void setMotionControls(int16_t gX = 0, int16_t gY = 0, int16_t gZ = 0, int16_t aX = 0, int16_t aY = 0, int16_t aZ = 0);
+    void setTouchpad(uint8_t pad, int16_t x = 0, int16_t y = 0, uint16_t pressure = 0);
+
+  protected:
+    virtual void onStarted(NimBLEServer *pServer) {};
+};
+
+#endif // CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
+#endif // CONFIG_BT_ENABLED
+#endif // ESP32_BLE_GAMEPAD_H
